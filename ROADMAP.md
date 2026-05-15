@@ -25,6 +25,7 @@ The roadmap deliberately advances all three axes in alternating phases so the sp
 - [x] [`PROTOCOL.md`](./PROTOCOL.md) draft 0.1 — wire shapes, ACP alignment, Workspace substrates (fs / shell / memory / audit), capability registry, manifest, errors.
 - [x] [`DESIGN.md`](./DESIGN.md) draft 0.1 — three-axis architecture (Agent × Workspace × Runtime), Workspace as a first-class pillar, non-goals.
 - [x] [`ROADMAP.md`](./ROADMAP.md) — phases, RFC process, open questions.
+- [x] [`COMPATIBILITY.md`](./COMPATIBILITY.md) — ACP-rooted matrix across Claude Code, Codex, Pi, AmpCode, Cursor.
 - [ ] `LICENSE` — MIT (in repo).
 - [ ] `CONTRIBUTING.md` — how to file RFCs and conformance reports.
 - [ ] `docs/adr/` directory — Architectural Decision Records as design questions are resolved.

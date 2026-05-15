@@ -55,6 +55,7 @@ A reference Ruby implementation is planned, but the protocol is language-agnosti
 |---|---|
 | [`PROTOCOL.md`](./PROTOCOL.md) | Wire protocol draft — message shapes, ACP alignment, Workspace substrate methods, capability registry, manifest, errors. |
 | [`DESIGN.md`](./DESIGN.md) | Top-level architecture — three-axis abstraction (Agent × Workspace × Runtime), Workspace as a first-class pillar, agent / workspace / runtime interfaces, manifests. |
+| [`COMPATIBILITY.md`](./COMPATIBILITY.md) | Developer reference — ACP-rooted compatibility matrix across Claude Code, Codex, Pi, AmpCode, Cursor. What each agent supports natively today. |
 | [`ROADMAP.md`](./ROADMAP.md) | Phased plan, RFC process, open questions, non-goals. |
 
 ## Relationship to existing efforts
