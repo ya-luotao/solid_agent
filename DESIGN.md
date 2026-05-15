@@ -168,6 +168,16 @@ Agents fall into two implementation styles:
 
 This is the design's "long tail" strategy: Solid Agent ships specialised adapters for agents that need translation today, and trusts ACP adoption to handle the rest.
 
+### 4.2 Reusing existing SDK transports
+
+Several agent SDKs already expose internal transport seams. [`claude-agent-sdk-ruby`](https://github.com/ya-luotao/claude-agent-sdk-ruby), for example, defines an abstract `Transport` class (`connect`, `write`, `read_messages`, `close`, `ready?`, `end_input`) and a `Client.new(transport_class:, transport_args:)` constructor; its [`docs/client.md`](https://github.com/ya-luotao/claude-agent-sdk-ruby/blob/main/docs/client.md) ships a worked example that swaps the default subprocess transport for an `E2BCliTransport` that streams stdio through an E2B microVM. The Codex SDK uses a similar JSON-RPC stdio seam.
+
+This is good news for Solid Agent: the `Agents::ClaudeCode` and `Agents::Codex` adapters do **not** need to re-implement an Agent's wire protocol. They reuse the SDK's existing transport hook and supply a Solid-Agent-shaped transport whose `read_messages` / `write` calls are translated into ACP `session/update` events and Workspace method invocations.
+
+Concretely, the reference implementation's `Agents::ClaudeCode` will hold a `claude-agent-sdk-ruby` `Client`, configured with a `transport_class:` whose implementation routes stdio through the bound Workspace's shell substrate (via `terminal/create` + `terminal/output`). Where today a user manually wires `transport_class: E2BCliTransport, transport_args: { sandbox: sandbox }` for one specific runtime, Solid Agent supplies the same wiring uniformly across every Runtime the Workspace is provisioned on.
+
+The single-SDK Transport pattern is the existence proof that Agent↔Runtime decoupling works in production. Solid Agent's contribution is to lift that pattern from "custom code per (agent, runtime) pair" to "implement an Agent adapter once, implement a Runtime adapter once, and they compose."
+
 ---
 
 ## 5. Runtime interface

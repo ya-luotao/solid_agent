@@ -39,6 +39,8 @@ Today every Host application that wants to support N agents × M workspaces × K
 
 **Solid Agent does not invent a new protocol.** It aligns with ACP for the on-the-wire format, borrows the Manifest concept from OpenAI's sandbox layer, adds Workspace substrates for overlay/memory/audit/mount inspired by the projects above, and specifies a small set of extensions for snapshot, pause, and resume that ACP does not yet cover.
 
+The pattern is also already partially in production in single-vendor form. The Ruby SDK [`claude-agent-sdk-ruby`](https://github.com/ya-luotao/claude-agent-sdk-ruby) ships a `Transport` abstract class with pluggable implementations — its [docs](https://github.com/ya-luotao/claude-agent-sdk-ruby/blob/main/docs/client.md) include a worked example that routes the Claude Code CLI's stdio through E2B by replacing only the transport class. That works because the agent SDK already decouples *the wire* from *the runtime*. Solid Agent generalises the same decoupling along three more axes: across multiple Agent backends, across pluggable Workspaces, and with the Workspace surface itself made externally addressable.
+
 The output is intended to be:
 
 1. A **protocol draft** — what's on the wire.
