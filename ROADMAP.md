@@ -1,42 +1,114 @@
 # Roadmap
 
-## v0.1 — Claude + Local + E2B
+## Phase 0 — Specification skeleton (current)
 
-- [ ] `SolidAgent::Agents::Claude` — wraps [`claude-agent-sdk`](https://github.com/ya-luotao/claude-agent-sdk-ruby).
-- [ ] `SolidAgent::Sandboxes::Local` — local subprocess.
-- [ ] `SolidAgent::Sandboxes::E2B` — wraps [`e2b`](https://github.com/ya-luotao/e2b-ruby) gem; bridges the agent's stdio through E2B's command RPC.
-- [ ] Event types: `TextEvent`, `ToolEvent`, `ToolResultEvent`, `ThinkingEvent`, `ResultEvent`, `ErrorEvent`.
-- [ ] `SolidAgent.run` (one-shot) and `SolidAgent.session` (interactive) helpers.
-- [ ] Manifest type for sandbox seeding (repos, files, env).
-- [ ] Smoke tests: Claude × Local, Claude × E2B.
-- [ ] Released as `solid_agent` gem on RubyGems.
+- [x] Repository scaffold.
+- [x] [`PROTOCOL.md`](./PROTOCOL.md) draft 0.1 — ACP foundation + runtime lifecycle + manifest + capability registry.
+- [x] [`DESIGN.md`](./DESIGN.md) draft 0.1 — two-axis architecture, wrapping rules, Ruby reference implementation sketch.
+- [x] [`COMPATIBILITY.md`](./COMPATIBILITY.md) — agent SDK feature matrix for adapter writers.
+- [x] [`CONTRIBUTING.md`](./CONTRIBUTING.md) — adapter contract for new agents and sandboxes.
+- [x] [`docs/adr/`](./docs/adr/) — first ADR landed (composable, not orthogonal).
+- [x] `LICENSE` — MIT.
 
-## v0.2 — Codex
+### Phase 0 exit criteria
 
-- [ ] `SolidAgent::Agents::Codex` — wraps [`codex-rb`](https://github.com/ya-luotao/codex-rb).
-- [ ] Smoke tests: Codex × Local, Codex × E2B.
-- [ ] Document any per-agent feature gaps (e.g., capability flags for `image_input`, `thinking`, `interrupt`).
+- The protocol document is internally consistent.
+- At least one independent reviewer has read it end-to-end.
+- All six open questions in [`PROTOCOL.md`](./PROTOCOL.md#open-questions) have at least one proposed answer.
 
-## v0.3+ — driven by user demand
+## Phase 1 — Ruby reference implementation minimum
 
-Concrete additions only after at least one user asks. Likely candidates:
+End-to-end demonstration: open a session with Claude Code on the Local runtime, prompt it to read and edit a file, observe the events, see the file change.
 
-- More sandboxes: Daytona, Modal, OpenAI built-in, Vercel Sandboxes.
-- More agents: when AmpCode / Cursor / Pi expose Ruby-callable surfaces, or via an ACP shim for any agent that speaks Agent Client Protocol.
-- ActiveRecord persistence helper for the event stream.
-- Snapshot/pause/resume semantics for sandboxes that support them.
-- HTTP/SSE server mode so non-Ruby hosts can drive a Solid Agent session.
-- OpenTelemetry tracing integration.
+### Spec deliverables
+
+- `PROTOCOL.md` draft 0.2 — incorporate Phase 0 feedback; freeze the `session/*` shapes.
+- ADRs for non-trivial decisions taken during implementation.
+
+### Ruby gem deliverables
+
+- `SolidAgent::Agents::Claude` (wraps [`claude-agent-sdk`](https://github.com/ya-luotao/claude-agent-sdk-ruby) via its `Transport` seam).
+- `SolidAgent::Agents::Mock`.
+- `SolidAgent::Sandboxes::Local` (subprocess via `Open3`).
+- `SolidAgent::Sandboxes::Mock`.
+- Event types: `TextEvent`, `ThinkingEvent`, `ToolEvent`, `ToolResultEvent`, `ResultEvent`, `ErrorEvent`.
+- `SolidAgent.run` / `SolidAgent.session` helpers.
+- Manifest type for sandbox seeding.
+- Smoke tests: Claude × Local, Mock × Local, Claude × Mock.
+
+## Phase 2 — Codex and E2B; HTTP/SSE; snapshot demo
+
+Demonstrate Runtime portability by snapshotting a session on E2B and resuming it later.
+
+### Spec deliverables
+
+- `PROTOCOL.md` draft 0.3 — finalise HTTP/SSE transport, reconnection semantics, snapshot/pause/resume.
+- Conformance test fixtures (JSON files) any implementation can run against itself.
+
+### Ruby gem deliverables
+
+- `SolidAgent::Agents::Codex` (wraps [`codex-rb`](https://github.com/ya-luotao/codex-rb)).
+- `SolidAgent::Agents::ACPDirect` — generic adapter for any ACP-speaking child process.
+- `SolidAgent::Sandboxes::E2B` (wraps [`e2b`](https://github.com/ya-luotao/e2b-ruby)).
+- HTTP/SSE server: minimum subset of `/v1/sessions/*` endpoints.
+- Manifest application end-to-end (clone repo → seed files → run agent → snapshot).
+- `examples/snapshot-resume/` — runnable demo + 90-second screencast.
+
+## Phase 3 — Runtime diversity
+
+- `SolidAgent::Sandboxes::Daytona`
+- `SolidAgent::Sandboxes::OpenAIBuiltin`
+
+Driven by user demand for any of: Modal, Cloudflare Containers, Vercel Sandboxes, Runloop, Blaxel.
+
+## Phase 4 — Agent diversity
+
+- `SolidAgent::Agents::AmpCode`
+- `SolidAgent::Agents::Cursor`
+- `SolidAgent::Agents::Pi`
+
+Likely via the `ACPDirect` adapter where the upstream agent ships ACP support, or via per-agent shims where it doesn't.
+
+## Phase 5 — Operability
+
+- Optional persistence adapters: ActiveRecord, Sequel.
+- Optional observability adapter: OpenTelemetry tracing for sessions.
+- Health-check and metrics endpoints on the HTTP server.
+- A session inspector web UI.
+
+## RFC process
+
+Non-trivial decisions are captured as **ADRs** in [`docs/adr/`](./docs/adr/). Process:
+
+1. Open an issue describing the proposal.
+2. If the issue gathers ≥1 supporter and ≥1 reviewer, draft an ADR PR.
+3. ADR template: context, decision, alternatives considered, consequences, status (`proposed | accepted | superseded`).
+4. ADRs are numbered (`ADR-0001-…`) and never rewritten — superseding ADRs cite their predecessor.
+5. The `PROTOCOL.md` change accompanies the ADR PR.
+
+Process scope:
+
+- **Anything in `PROTOCOL.md`** — requires an ADR.
+- **Anything in the capability registry** — requires an ADR.
+- **`DESIGN.md` shape and section structure** — no ADR required, but PRs should explain motivation.
+- **Reference-implementation internals** — no ADR required.
+
+## Conformance
+
+Each major spec milestone ships a conformance test suite: JSON-RPC transcripts and expected behaviours any implementation can run against itself. A new Agent or Runtime claiming Solid Agent compatibility is encouraged to publish a conformance report.
 
 ## Non-goals
 
-- **A multi-language protocol spec.** Solid Agent is a Ruby gem. Cross-language interop, if it ever happens, lives in a separate project.
-- **Replacing the underlying SDKs.** `claude-agent-sdk`, `codex-rb`, and `e2b` keep their own roadmaps; this gem only composes them.
-- **A workflow / DAG engine.** Use Sidekiq, Temporal, your own — whatever fits. Solid Agent gives you the per-session primitive; orchestration is the host application's job.
-- **A standard wire format across vendors.** Each agent SDK already has its own; the gem normalises events in Ruby, not on a wire.
+- A multi-language standard body. The protocol is wire-portable, but governance stays light and contributor-driven.
+- Replacement for ACP. Solid Agent uses ACP for the wire format; we contribute back if a SAP extension proves general enough.
+- Replacement for MCP. Tools, resources, and prompts stay in MCP's lane.
+- A bundled workflow engine.
+- A bundled UI.
+- A workspace substrate spec (overlay filesystems, mount kinds, in-process shells, memory/audit stores). The runtime provides a working directory and a shell; richer substrates can come later if usage data demands it.
 
 ## How to help
 
-- File an issue if your use case isn't covered.
-- PRs welcome for new agents / sandboxes — see [CONTRIBUTING.md](./CONTRIBUTING.md).
-- Sketches of failure modes ("here's what went wrong when I tried X") are particularly useful while the gem is pre-alpha.
+- Read [`PROTOCOL.md`](./PROTOCOL.md) and file an issue for any ambiguity.
+- Propose a capability for the registry if your agent or runtime needs something that's not there.
+- Sketch an adapter for an agent or runtime not yet in the roadmap.
+- Build a Host that drives the protocol — the earliest Hosts will shape the spec the most.

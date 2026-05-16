@@ -1,63 +1,73 @@
 # Solid Agent
 
-A Ruby gem that runs a coding agent in a sandbox with one API.
+> **Status:** Early draft — open for discussion. Pre-alpha; no published gem yet.
+
+**Solid Agent** is an open protocol — built on top of the [Agent Client Protocol (ACP)](https://agentclientprotocol.com/) — that wraps coding-agent SDKs and sandbox runtimes so they compose. A Ruby reference implementation ships alongside the spec.
 
 ```ruby
 SolidAgent.run('add tests for the auth module', agent: :claude, sandbox: :e2b)
 ```
 
-That's the pitch. Solid Agent composes three existing Ruby gems so you don't have to:
+The protocol specifies how to wrap an agent SDK so it speaks ACP, how to wrap a sandbox SDK so it fulfils ACP's client-side methods (`fs/*`, `terminal/*`), and adds a small set of runtime lifecycle methods (`runtime/snapshot`, `runtime/pause`, `runtime/resume`, `runtime/manifest_apply`) that ACP does not yet specify.
 
-- [`claude-agent-sdk`](https://github.com/ya-luotao/claude-agent-sdk-ruby) — Claude Code SDK for Ruby
-- [`codex-rb`](https://github.com/ya-luotao/codex-rb) — OpenAI Codex SDK for Ruby
-- [`e2b`](https://github.com/ya-luotao/e2b-ruby) — E2B Firecracker sandbox SDK for Ruby
-
-Pick an agent. Pick a sandbox. Solid Agent handles the wiring.
-
-## Status
-
-Pre-alpha. The README is ahead of the code. Issues and PRs welcome.
-
-## Install
-
-```ruby
-# Gemfile
-gem 'solid_agent'
+```
+              ┌────── Agent ──────┐         ┌────── Runtime ──────┐
+              │ Claude Code       │         │ Local                │
+              │ Codex             │         │ E2B                  │
+              │ AmpCode           │ ─ ACP ─ │ Daytona              │
+              │ Cursor            │         │ Modal                │
+              │ Pi                │         │ Cloudflare           │
+              │ ACPDirect         │         │ Vercel               │
+              │ … any ACP agent   │         │ Runloop / Blaxel     │
+              └───────────────────┘         │ OpenAI built-in      │
+                                             │ … any ACP runtime    │
+                                             └──────────────────────┘
 ```
 
-```sh
-bundle install
-```
+## Why this exists
 
-## Examples
+Coding-agent SDKs and sandbox runtimes have proliferated. Composing them by hand for every project means re-writing the same glue — translating between each SDK's native event vocabulary and ACP-shaped messages, bridging the agent CLI's stdio through whichever sandbox you picked, handling reconnection, snapshots, and so on.
 
-### One-shot
+Solid Agent puts that glue in one place. The protocol is small (ACP + four runtime lifecycle methods + a manifest); the reference implementation is a Ruby gem.
+
+## Three reference SDKs power the Ruby implementation
+
+| Layer | Backed by |
+|---|---|
+| Claude Code agent | [`claude-agent-sdk`](https://github.com/ya-luotao/claude-agent-sdk-ruby) — already exposes a pluggable `Transport`, which makes wrapping it through any runtime straightforward. |
+| Codex agent | [`codex-rb`](https://github.com/ya-luotao/codex-rb) |
+| E2B sandbox | [`e2b`](https://github.com/ya-luotao/e2b-ruby) |
+
+Other Solid Agent agents and runtimes are welcome — see [CONTRIBUTING.md](./CONTRIBUTING.md) for the adapter contract.
+
+## Contents
+
+| File | Purpose |
+|---|---|
+| [`PROTOCOL.md`](./PROTOCOL.md) | Wire spec — ACP foundation, runtime lifecycle extension, manifest, capability registry, errors. |
+| [`DESIGN.md`](./DESIGN.md) | Architecture and rationale — two-axis composition, how wrapping works, Ruby reference implementation. |
+| [`COMPATIBILITY.md`](./COMPATIBILITY.md) | Adapter writer's reference — what each agent SDK supports natively, with mapping notes. |
+| [`ROADMAP.md`](./ROADMAP.md) | Phased plan, RFC process, open questions. |
+| [`CONTRIBUTING.md`](./CONTRIBUTING.md) | How to write a new Agent or Runtime adapter. |
+| [`docs/adr/`](./docs/adr/) | Architectural Decision Records. |
+
+## Ruby quick start
 
 ```ruby
 require 'solid_agent'
 
+# One-shot
 result = SolidAgent.run('Summarize this repo')
-puts result.text
-puts result.cost_usd
-```
 
-### Pick an agent
-
-```ruby
+# Pick an agent
 SolidAgent.run('Write a Fibonacci function', agent: :codex)
-SolidAgent.run('Audit auth.rb for issues',   agent: :claude)
-```
+SolidAgent.run('Audit auth.rb',              agent: :claude)
 
-### Pick a sandbox
-
-```ruby
+# Pick a sandbox
 SolidAgent.run('Run the tests', sandbox: :local)
 SolidAgent.run('Run the tests', sandbox: :e2b, sandbox_opts: { template: 'ubuntu-22-04' })
-```
 
-### Stream events
-
-```ruby
+# Stream events
 SolidAgent.run('Refactor billing.rb') do |event|
   case event
   when SolidAgent::TextEvent   then print event.text
@@ -65,88 +75,32 @@ SolidAgent.run('Refactor billing.rb') do |event|
   when SolidAgent::ResultEvent then puts "\nDone (#{event.duration_ms}ms, $#{event.cost_usd})"
   end
 end
-```
 
-### Interactive session
-
-```ruby
+# Interactive session
 session = SolidAgent.session(agent: :claude, sandbox: :e2b)
 session.start('Read the codebase')
 session.prompt('Now add tests for the auth flow')
-session.prompt('Now run them')
 session.close
 ```
 
-### Manifest (seed the sandbox)
+## Relationship to existing efforts
 
-```ruby
-SolidAgent.run(
-  'Fix the failing test in app/models/user.rb',
-  agent: :claude,
-  sandbox: :e2b,
-  manifest: {
-    repos: [{ url: 'git@github.com:org/app.git', ref: 'main', dest: 'app' }],
-    env:   { 'GITHUB_TOKEN' => ENV['GH_TOKEN'] }
-  }
-)
-```
+- **[Agent Client Protocol](https://agentclientprotocol.com/)** — adopted verbatim as the wire vocabulary. Solid Agent adds runtime lifecycle and manifest on top, and documents the rules for wrapping non-ACP agents.
+- **[SandboxAgent](https://sandboxagent.dev/)** — the HTTP surface uses the same `/v1/acp/*` namespacing so existing SandboxAgent clients can talk to a Solid Agent server.
+- **OpenAI Agents SDK `agents.sandbox`** — the runtime provider list and the `Manifest` concept come from here.
+- **[Model Context Protocol](https://modelcontextprotocol.io/)** — MCP defines what tools an agent can call; Solid Agent defines where the agent runs. They compose at different layers. See [DESIGN §8](./DESIGN.md#8-solid-agent-and-mcp).
 
-## Supported
+## Getting involved
 
-**Agents**
+The first useful PRs are likely:
 
-| Symbol | Backed by |
-|---|---|
-| `:claude` | [`claude-agent-sdk`](https://github.com/ya-luotao/claude-agent-sdk-ruby) gem |
-| `:codex`  | [`codex-rb`](https://github.com/ya-luotao/codex-rb) gem |
+- Clarifications, typos, and ambiguity reports on `PROTOCOL.md`.
+- Counter-proposals for any design decision in `DESIGN.md`.
+- Sketches of how a specific agent or runtime would adapt to the proposed interface.
+- Compatibility-matrix corrections.
 
-**Sandboxes**
-
-| Symbol | Backed by |
-|---|---|
-| `:local` | local subprocess |
-| `:e2b`   | [`e2b`](https://github.com/ya-luotao/e2b-ruby) gem (E2B Firecracker microVMs) |
-
-More on the [roadmap](./ROADMAP.md).
-
-## Why this gem
-
-Each of the three underlying SDKs is good on its own. Composing them by hand means re-writing the same glue for every project:
-
-- Translating between Claude's stream-JSON messages and Codex's JSON-RPC notifications.
-- Bridging the agent's CLI stdio through E2B's command RPC.
-- Normalising events, tool calls, costs, and errors across agents.
-- Handling sandbox lifecycle (provision, pause, resume, snapshot).
-
-Solid Agent puts that glue in one place. The public surface is Ruby objects — there's no protocol to learn beyond the gem's documented classes.
-
-## Design notes
-
-- **Agent and Sandbox are separate.** Each is a small Ruby class with a known method set. Pair any agent with any sandbox; capability negotiation refuses incompatible pairs at session creation.
-- **Events are normalised.** Both Claude's and Codex's native event vocabularies are mapped into one Ruby event hierarchy (`TextEvent`, `ToolEvent`, `ToolResultEvent`, `ResultEvent`, `ErrorEvent`).
-- **Transports are reused, not re-implemented.** `claude-agent-sdk` already exposes a pluggable `Transport`; the `:e2b` sandbox uses it to bridge stdio through E2B's command RPC. Same idea for `codex-rb`'s `AppServerClient`.
-- **No protocol invention.** Solid Agent doesn't define a wire format — it's a Ruby gem with Ruby idioms. The underlying SDKs handle each agent's actual wire protocol.
-
-## Adding your own agent or sandbox
-
-```ruby
-class SolidAgent::Agents::MyAgent < SolidAgent::Agent
-  def start(prompt, sandbox:, options: {}, &on_event)
-    # call your backend; yield SolidAgent::Event objects
-  end
-end
-
-class SolidAgent::Sandboxes::MySandbox < SolidAgent::Sandbox
-  def provision(manifest); end
-  def run_command(command, **opts); end
-  def read_file(path); end
-  def write_file(path, content); end
-  def finalize; end
-end
-```
-
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full contract.
+Architectural decisions are captured as numbered ADRs in [`docs/adr/`](./docs/adr/).
 
 ## License
 
-MIT — see [LICENSE](./LICENSE).
+MIT — see [`LICENSE`](./LICENSE).
