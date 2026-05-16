@@ -1,6 +1,7 @@
 # Agent Compatibility Matrix
 
 > **Status:** Draft 0.1 — open for correction. Vendor surfaces change quickly; please file issues or PRs when you spot drift.
+> **Scope:** SAP v0.1 covers Agent ↔ Runtime decoupling only; rows that reference workspace substrates (filesystem overlays, mounts, audit, memory) flag what would be **future SAP extensions** rather than v0.1 features. See [`FUTURE.md`](./FUTURE.md) for parked design notes.
 > **Last verified:** May 2026.
 
 This document is a developer reference. It enumerates the [Agent Client Protocol (ACP)](https://agentclientprotocol.com/) capability surface as the canonical baseline, then shows whether each major coding-agent SDK has a native, partial, or no equivalent.
@@ -150,9 +151,9 @@ The matrix exists to answer two practical questions:
 | Local file-backed transcripts | ✗ (host's job) | ✓ (`~/.claude/projects/`) | ✓ (`~/.codex/sessions/`) | ✓ (`~/.pi/agent/sessions/`) | ◐ (synced to ampcode.com) | ◐ (cloud-only) |
 | Cross-device resume | ✗ (host's job) | ◐ (via file sync) | ◐ (via file sync) | ◐ (via file sync) | ✓ (native) | ✓ (native) |
 | Tree-structured / forkable sessions | ✗ | ◐ (rewind support) | ◐ (rewind support) | ✓ (parent id, `fork()`, `/tree`) | ✓ (`amp threads fork`) | ✗ |
-| Workspace state captured with session | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Workspace state captured with session (future SAP extension) | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 
-**Implication for adapters.** "Workspace state captured with session" is the row where every vendor scores ✗ — and where SAP's `fs.export` capability is most differentiated. An [AgentFS](https://github.com/tursodatabase/agentfs)-backed Workspace can serialise its full state alongside the session transcript; no agent SDK ships this today.
+**Implication for adapters.** "Workspace state captured with session" is the row where every vendor scores ✗. This is a candidate for a future SAP extension tied to the `fs.export` and audit ideas tracked in [`FUTURE.md`](./FUTURE.md); v0.1 does not specify it.
 
 ## 9. Pluggable transport (the key dev question)
 
@@ -196,12 +197,12 @@ If you maintain or work on an agent listed here and a cell is wrong, please open
 
 ## Where this matrix points the spec
 
-A few patterns visible across the matrix are worth highlighting as RFC candidates:
+A few patterns visible across the matrix are worth highlighting as RFC candidates for future SAP versions (see [`FUTURE.md`](./FUTURE.md)):
 
-1. **`session/steer` as a SAP extension.** Codex and Pi both ship it; the ergonomic story for long-running agents would benefit from a standard wire shape. (Relates to [PROTOCOL OQ-9](./PROTOCOL.md#open-questions).)
-2. **`workspace_state` capture-with-session.** Every vendor scores ✗ here, and AgentFS already demonstrates the design. This is the gap Solid Agent's Workspace layer is most positioned to close — see [DESIGN §3](./DESIGN.md#3-the-workspace-contract).
-3. **Approval guardian patterns.** Codex's "guardian review" pattern is unusual but valuable for high-risk workflows. Worth considering as an optional capability (`audit.guardian_review`) once SAP has more deployment data.
-4. **Transport public interface as a vendor expectation.** Claude Code's `Transport` class is the strongest enabler in the matrix. Encouraging other SDKs to expose a comparable seam would make the entire ecosystem more composable, and is a reasonable upstream ask.
+1. **`session/steer` as a SAP extension.** Codex and Pi both ship mid-turn input injection; a standard wire shape would help long-running agent ergonomics. Tracked in `FUTURE.md`.
+2. **Workspace state capture-with-session.** Every vendor scores ✗ here. The substrate-level work in AgentFS / Mirage / just-bash points at how this might be specified, but v0.1 explicitly defers — see [`FUTURE.md`](./FUTURE.md) and [ADR-0003](./docs/adr/0003-defer-workspace-substrates.md).
+3. **Approval guardian patterns.** Codex's "guardian review" is valuable for high-risk autonomous flows. Worth considering as an optional capability once SAP has audit infrastructure to back it.
+4. **Transport public interface as a vendor expectation.** Claude Code's `Transport` class is the strongest enabler in the matrix and the closest existing pattern to what v0.1 generalises. Encouraging other SDKs to expose a comparable seam makes the entire ecosystem more composable — a reasonable upstream ask for Codex / AmpCode / Cursor / Pi maintainers.
 
 ---
 

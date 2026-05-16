@@ -2,18 +2,11 @@
 
 > **Status:** Draft 0.1 — direction-of-travel, not a commitment.
 > Items are best understood as RFC slots; community proposals can rearrange or replace any of them.
+> **Scope:** v0.1 covers the Agent ↔ Runtime contract. Workspace substrate ideas are explicitly deferred — see [FUTURE.md](./FUTURE.md).
 
 This is a phased plan for the Solid Agent specification and its first reference implementation. Each phase describes **what the specification needs to be considered "done enough" to use at that stage**, and what the reference implementation needs to deliver to validate it.
 
-The phases are sequential because each unlocks the next. Dates are intentionally absent — the project moves at the speed of review and contributions.
-
-The plan exercises three orthogonal axes of progress (see [DESIGN.md](./DESIGN.md)):
-
-- **Agent** axis — backends like Claude Code, Codex, AmpCode, Cursor, Pi.
-- **Workspace** axis — substrates: POSIX, AgentFS-backed (overlay / audit / portable), Mirage-backed (mounted heterogeneous backends), just-bash-backed (in-process shell).
-- **Runtime** axis — execution boundaries: Local, E2B, Daytona, Modal, Cloudflare Containers, Vercel Sandboxes, Runloop, Blaxel, OpenAI built-in.
-
-The roadmap deliberately advances all three axes in alternating phases so the spec is exercised by genuinely diverse combinations rather than a long single-vendor chain.
+The phases are sequential because each unlocks the next. Dates are intentionally absent except for **the Phase 2 demo deadline**, which is committed to (see below).
 
 ---
 
@@ -22,20 +15,21 @@ The roadmap deliberately advances all three axes in alternating phases so the sp
 **Goal:** Establish enough of the spec that an implementer could start a prototype.
 
 - [x] Repository scaffold.
-- [x] [`PROTOCOL.md`](./PROTOCOL.md) draft 0.1 — wire shapes, ACP alignment, Workspace substrates (fs / shell / memory / audit), capability registry, manifest, errors.
-- [x] [`DESIGN.md`](./DESIGN.md) draft 0.1 — three-axis architecture (Agent × Workspace × Runtime), Workspace as a first-class pillar, non-goals.
-- [x] [`ROADMAP.md`](./ROADMAP.md) — phases, RFC process, open questions.
+- [x] [`PROTOCOL.md`](./PROTOCOL.md) draft 0.1 — wire shapes, ACP alignment, Runtime methods, capability registry, manifest, errors.
+- [x] [`DESIGN.md`](./DESIGN.md) draft 0.1 — two-axis architecture, composable+capability-negotiated, Solid Agent vs MCP boundary, non-goals.
+- [x] [`ROADMAP.md`](./ROADMAP.md) — phases, RFC process, open questions, 90-day demo target.
 - [x] [`COMPATIBILITY.md`](./COMPATIBILITY.md) — ACP-rooted matrix across Claude Code, Codex, Pi, AmpCode, Cursor.
-- [ ] `LICENSE` — MIT (in repo).
+- [x] [`FUTURE.md`](./FUTURE.md) — parked workspace substrate ideas, with provenance.
+- [x] `LICENSE` — MIT.
+- [x] `docs/adr/` — first ADRs landed (composable-not-orthogonal, Solid Agent vs MCP, defer-workspace-substrates).
 - [ ] `CONTRIBUTING.md` — how to file RFCs and conformance reports.
-- [ ] `docs/adr/` directory — Architectural Decision Records as design questions are resolved.
 - [ ] First round of community feedback collected as issues.
 
 ### Phase 0 exit criteria
 
 - The protocol document is internally consistent (no contradictions between sections).
 - At least one independent reviewer has read it end-to-end and either agreed it is buildable or filed specific objections.
-- All ten open questions in [`PROTOCOL.md`](./PROTOCOL.md#open-questions) have at least one proposed answer in an issue.
+- All six open questions in [`PROTOCOL.md`](./PROTOCOL.md#open-questions) have at least one proposed answer in an issue.
 
 ---
 
@@ -43,7 +37,7 @@ The roadmap deliberately advances all three axes in alternating phases so the sp
 
 **Goal:** Prove the spec is implementable by shipping a working Ruby gem that can do one realistic end-to-end run.
 
-The defining end-to-end test: **"open a session with the Claude Code Agent on a POSIX Workspace hosted by the Local Runtime, send a prompt that requires reading and editing a file, receive `session/update` events, and observe the file change on disk."**
+The defining end-to-end test: **"open a session with the Claude Code Agent on the Local Runtime, send a prompt that requires reading and editing a file, receive `session/update` events, and observe the file change on disk."**
 
 ### Spec deliverables
 
@@ -52,99 +46,83 @@ The defining end-to-end test: **"open a session with the Claude Code Agent on a 
 
 ### Reference implementation deliverables
 
-- `Agents::ClaudeCode` — adapter over [`claude-agent-sdk-ruby`](https://github.com/ya-luotao/claude-agent-sdk-ruby).
+- `Agents::ClaudeCode` — adapter over [`claude-agent-sdk-ruby`](https://github.com/ya-luotao/claude-agent-sdk-ruby), reusing its `Transport` seam.
 - `Agents::Mock` — deterministic test double.
-- `Workspaces::Posix` — the default Workspace: real filesystem + subprocess shell, no memory or audit.
-- `Workspaces::Mock` — in-memory FS and scripted terminal.
-- `Runtimes::Local` — provisions a POSIX Workspace on the host machine.
-- `Runtimes::Mock` — provisions a Mock Workspace.
+- `Runtimes::Local` — local-machine execution via `Open3` (or equivalent).
+- `Runtimes::Mock` — in-memory FS, scripted terminal.
 - Stdio transport, end to end.
-- Test suite: 2 Agents × 2 Workspaces × 2 Runtimes smoke matrix.
+- Test suite: 2 Agents × 2 Runtimes smoke matrix.
 
 ### Phase 1 exit criteria
 
 - A user can run the published quick-start example from a fresh `bundle install`.
 - The protocol document still matches the implementation.
-- Independent contributors can write a new Runtime or Workspace by following the documentation alone.
+- Independent contributors can write a new Runtime by following the documentation alone.
 
 ---
 
-## Phase 2 — Multi-agent, multi-runtime
+## Phase 2 — 90-day demo (committed deadline)
 
-**Goal:** Validate the Agent and Runtime axes by shipping one more Agent backend and one cloud Runtime, confirming any pair composes.
+**Goal:** Prove that swapping the Runtime is real, not theoretical. This is the project's primary defence against "spec-first death" — a working visible artefact that demonstrates Runtime portability.
+
+**Deadline:** 90 days from Phase 1 exit. **Non-negotiable.** If the demo slips, the project enters re-scope mode rather than chasing later phases.
+
+### Demo scenario
+
+1. Open a session with `Agents::ClaudeCode` on `Runtimes::Local`. Run a short coding task (e.g., "add a function to this file and run the test"). Observe `session/update` events and the file change.
+2. `runtime/snapshot` the same session running on `Runtimes::E2B` after the test passes.
+3. Close the session.
+4. The next day, open a new session bootstrapped from the snapshot. Continue the work without re-cloning the repo or re-running the prior steps.
+5. Render the whole flow as a 90-second screencast.
 
 ### Spec deliverables
 
-- `PROTOCOL.md` draft 0.3 — finalise HTTP/SSE transport, reconnection semantics, capability registry expansion.
-- Capability registry promoted to its own document (`CAPABILITIES.md`) with an RFC process for additions.
+- `PROTOCOL.md` draft 0.3 — finalise HTTP/SSE transport, reconnection semantics, snapshot/pause/resume capability semantics.
+- ADRs for snapshot resume semantics.
 - Conformance test fixtures (JSON files) any implementation can run against itself.
 
 ### Reference implementation deliverables
 
-- `Agents::Codex` — adapter over [`codex-rb`](https://github.com/openai/codex-rb) or equivalent.
+- `Agents::Codex` — adapter over [`codex-rb`](https://github.com/openai/codex-rb) (or equivalent).
 - `Agents::ACPDirect` — generic adapter for any ACP-speaking child process.
-- `Runtimes::E2B` — adapter over [`e2b-ruby`](https://github.com/heymoney/e2b-ruby).
+- `Runtimes::E2B` — adapter over [`e2b-ruby`](https://github.com/heymoney/e2b-ruby), with snapshot / pause / resume / port forward.
 - HTTP/SSE server: minimum subset of `/v1/sessions/*` endpoints.
-- Manifest application path end to end (clone repo → seed files → run agent → observe edits).
+- Manifest application path end to end (clone repo → seed files → run agent → snapshot → resume).
+- `examples/snapshot-resume/` — the demo scenario, runnable.
 
 ### Phase 2 exit criteria
 
-- All `(Agent, Workspace, Runtime)` pairs in the smoke matrix pass with the default POSIX Workspace: ClaudeCode×POSIX×Local, ClaudeCode×POSIX×E2B, Codex×POSIX×Local, Codex×POSIX×E2B, ACPDirect×POSIX×Local, ACPDirect×POSIX×E2B.
-- A separately-authored Host can drive the HTTP server using only the published surface description.
+- The demo runs from a clean clone with `bundle install` + one command.
+- The 90-second screencast is published.
+- All `(Agent, Runtime)` pairs in the smoke matrix pass: ClaudeCode×Local, ClaudeCode×E2B, Codex×Local, Codex×E2B, ACPDirect×Local, ACPDirect×E2B.
 - At least one external implementation has filed a "conformance report" issue.
 
 ---
 
-## Phase 3 — Workspace substrates
-
-**Goal:** Validate the Workspace axis by adding richer substrates and proving they compose with any Agent and any Runtime.
-
-This phase is where Solid Agent's first-class Workspace pays off. After it lands, a Host should be able to choose its Workspace shape independently from its Runtime and Agent.
-
-### Spec deliverables
-
-- `PROTOCOL.md` draft 0.4 — promote overlay, snapshot, mount, memory, and audit methods from extension to core where stable. Tighten `fs.tool_isolation` semantics (resolves OQ-9).
-- ADRs covering: how overlays interact with terminals, when memory `set` is durable, what `audit.tool_calls` records vs what stays in the Host's event store.
-
-### Reference implementation deliverables
-
-- `Workspaces::AgentFS` — Workspace backed by [AgentFS](https://github.com/tursodatabase/agentfs). Advertises `fs.overlay`, `fs.tool_isolation`, `memory.kv`, `audit.tool_calls`, `audit.fs_changes`, `fs.export`.
-- `Workspaces::Mirage` — Workspace backed by [Mirage](https://github.com/strukto-ai/mirage). Advertises `fs.mount` plus a subset of backend kinds (`mount.s3`, `mount.gdocs`, `mount.slack`, `mount.github` — actual list to be decided alongside Mirage's stable surface).
-- `Workspaces::JustBash` — Workspace whose Shell substrate is [just-bash](https://github.com/vercel-labs/just-bash), running in-process. Advertises `exec.in_process`, `exec.languages.*`, `exec.limits`. Useful for tests, CI smoke runs, and untrusted execution where subprocess isolation is unwanted.
-- Composition tests: AgentFS Workspace inside Local Runtime, AgentFS Workspace inside E2B Runtime, Mirage Workspace + Codex Agent, just-bash Workspace + Claude Code Agent.
-
-### Phase 3 exit criteria
-
-- A Workspace can be added to the reference implementation in under ~500 lines of Ruby plus its substrate's native SDK.
-- The audit substrate produces records that can reconstruct a session even after the Host's event stream is lost.
-- An AgentFS-backed Workspace can be exported as a single file, transferred to another machine, and reopened as a new Solid Agent session.
-
----
-
-## Phase 4 — Runtime diversity
+## Phase 3 — Runtime diversity
 
 **Goal:** Demonstrate that the Runtime contract scales beyond a single cloud provider.
 
 ### Spec deliverables
 
 - Snapshot, pause, resume semantics promoted from extension to core spec where stable.
-- `host_for_port` and `mount.*` capabilities clarified with worked examples per provider.
-- Recommended floor for reconnect-buffer window (resolves OQ-6).
+- `host_for_port` capability clarified with worked examples per provider.
+- Recommended floor for reconnect-buffer window (resolves OQ-5).
 
 ### Reference implementation deliverables
 
 - `Runtimes::Daytona`
-- `Runtimes::OpenAIBuiltin` — Unix-local equivalent of the OpenAI Agents SDK's first-party sandbox.
+- `Runtimes::OpenAIBuiltin`
 - Capability-driven Workflow examples: pause-between-nodes, snapshot-before-risky-action, port-forward to a long-running dev server.
 
-### Phase 4 exit criteria
+### Phase 3 exit criteria
 
-- A Runtime can be added in under 500 lines of Ruby plus a manifest provisioning script.
+- A Runtime can be added in under ~500 lines of Ruby plus a manifest provisioning script.
 - The capability registry has accommodated at least one community-proposed capability.
 
 ---
 
-## Phase 5 — Agent diversity
+## Phase 4 — Agent diversity
 
 **Goal:** Demonstrate that the Agent contract scales beyond Claude Code and Codex.
 
@@ -160,37 +138,37 @@ This phase is where Solid Agent's first-class Workspace pays off. After it lands
 - `Agents::Pi` (likewise).
 - Documentation page on "how to add an Agent" with worked examples.
 
-### Phase 5 exit criteria
+### Phase 4 exit criteria
 
-- At least three Agents from independent vendors run on at least three Workspaces and three Runtimes, all in independent combinations.
+- At least three Agents from independent vendors run on at least three Runtimes, in any combination.
 - The "how to add an Agent" page is followable by someone outside the core team.
 
 ---
 
-## Phase 6 — Operability
+## Phase 5 — Operability
 
 **Goal:** Make the reference implementation production-grade.
 
 ### Spec deliverables
 
 - Observability extension — what's in `usage_update`, what an OpenTelemetry mapping looks like, what trace boundaries SAP recommends.
-- Security model draft — secret-store reference resolution, egress-policy hints (resolves OQ-7).
+- Security model draft — secret-store reference resolution, egress-policy hints (resolves OQ-6).
 
 ### Reference implementation deliverables
 
 - Optional persistence adapters: ActiveRecord, Sequel.
 - Optional observability adapter: OpenTelemetry tracing for sessions.
 - Health-check and metrics endpoints on the HTTP server.
-- A "session inspector" web UI that subscribes to a session's stream and renders it. Where the Workspace advertises `audit.tool_calls`, the inspector reads from the audit substrate as a backup data source.
+- A "session inspector" web UI that subscribes to a session's stream and renders it.
 
-### Phase 6 exit criteria
+### Phase 5 exit criteria
 
-- A Host can run Solid Agent in production and answer "what happened in this session?" from persisted state alone — either the Host's event store or the Workspace's audit substrate.
+- A Host can run Solid Agent in production and answer "what happened in this session?" from persisted state alone.
 - Observability hooks compose with existing OpenTelemetry pipelines.
 
 ---
 
-## Phase 7 — Long-tail runtimes
+## Phase 6 — Long-tail runtimes
 
 **Goal:** Close the seven-provider gap to the OpenAI Agents SDK list, plus anything else the community has built.
 
@@ -202,24 +180,26 @@ This phase is where Solid Agent's first-class Workspace pays off. After it lands
 - `Runtimes::Runloop`
 - `Runtimes::Blaxel`
 
-### Phase 7 exit criteria
+### Phase 6 exit criteria
 
 - The Runtime list in [`README.md`](./README.md) matches the OpenAI Agents SDK list at parity.
 - All Runtimes pass the conformance test suite.
 
 ---
 
-## Phase 8 — Beyond coding agents
+## Phase 7+ — Workspace substrates and beyond
 
-**Goal:** Confirm or refute the assumption that Solid Agent generalises beyond coding tasks.
+After Phase 6, when v0.1 has shipped, run in production, and accumulated usage data, the deferred ideas in [`FUTURE.md`](./FUTURE.md) come back as RFCs:
 
-Intentionally open-ended. Possible directions:
+- Filesystem overlays, snapshots-at-file-level, tool-call isolation, export.
+- Mounted heterogeneous backends.
+- In-process shell substrates with execution limits.
+- Memory and audit stores.
+- A host-side Tools layer.
+- `session/steer` as a wire method.
+- Approval guardian.
 
-- Browser-driving agents (operator-style) — does ACP's tool-call vocabulary stretch, or do we need a new capability?
-- Long-running autonomous agents — does the session model scale to runs measured in days?
-- Multi-agent collaboration within a single session — can a Workspace host two Agents concurrently, sharing FS and memory under different namespaces?
-
-Output of this phase is a decision: keep the spec coding-focused, or evolve toward a broader "Agent Workspace" protocol.
+Each will require its own RFC, ADR, and reference implementation. Beyond that, the open-ended question of whether SAP generalises beyond coding agents — to browser-driving operators, long-running autonomous agents, multi-agent collaboration in a single session — is a Phase 7+ decision.
 
 ---
 
@@ -229,7 +209,7 @@ Decisions of any consequence are captured as **ADRs** (Architecture Decision Rec
 
 1. Open an issue describing the proposal.
 2. If the issue gathers ≥1 supporter and ≥1 reviewer, draft an ADR PR.
-3. ADR template: context, proposed decision, alternatives considered, consequences (both intended and accepted downsides), status (`proposed | accepted | superseded`).
+3. ADR template: context, proposed decision, alternatives considered, consequences (intended and accepted downsides), status (`proposed | accepted | superseded`).
 4. ADRs are numbered (`ADR-0001-…`) and never rewritten — superseding ADRs cite their predecessor.
 5. The `PROTOCOL.md` change accompanies the ADR PR.
 
@@ -244,42 +224,41 @@ Process scope:
 
 ## Conformance
 
-Each major spec milestone ships a **conformance test suite**: a set of JSON-RPC transcripts and expected behaviours that any implementation can run against itself. A new Agent, Workspace, or Runtime claiming SAP compatibility is encouraged to publish a conformance report (pass/fail per scenario) as part of its release notes.
+Each major spec milestone ships a **conformance test suite**: JSON-RPC transcripts and expected behaviours any implementation can run against itself. A new Agent or Runtime claiming SAP compatibility is encouraged to publish a conformance report (pass/fail per scenario) as part of its release notes.
 
 Conformance is per-capability, not per-spec-version. Reports look like:
 
 ```
-my-workspace v0.3.1
-  Role: Workspace
+my-runtime v0.3.1
   SAP protocol_version: 1
-  Capabilities advertised: fs, fs.list, fs.overlay, fs.tool_isolation, memory.kv, audit.tool_calls
+  Capabilities advertised: fs, fs.list, terminal, pause, snapshot
   Conformance:
-    fs:                12/12 pass
-    fs.list:            4/4  pass
-    fs.overlay:         8/8  pass
-    fs.tool_isolation:  6/6  pass
-    memory.kv:          5/5  pass
-    audit.tool_calls:   4/4  pass
+    fs:        12/12 pass
+    fs.list:    4/4  pass
+    terminal: 18/20  pass  (2 known issues filed: #42, #43)
+    pause:     6/6   pass
+    snapshot:  5/5   pass
 ```
 
 ---
 
-## Non-goals (current and forecasted)
+## Non-goals
 
 - A standardised model serving API — Solid Agent does not specify how an Agent reaches an LLM.
 - A standardised auth model for end-users — Hosts handle their own auth.
 - A bundled workflow engine — workflows compose on top.
 - A bundled UI — `DESIGN.md` explicitly leaves rendering to Hosts.
 - An IDE plugin — could be built on top, but out of scope here.
-- A standardised skill format — skill bundles live inside manifests; how they are authored or distributed is out of scope.
+- Replacement for MCP — see [`DESIGN.md §3`](./DESIGN.md#3-solid-agent-vs-mcp--where-the-boundary-is).
+- Workspace substrate definition in v0.1 — see [`FUTURE.md`](./FUTURE.md).
 
 ---
 
 ## How to help
 
 - **Read [`PROTOCOL.md`](./PROTOCOL.md) and file an issue** for any ambiguity, missing case, or design objection.
-- **Propose a capability** for the registry if your Agent, Workspace, or Runtime needs something that's not there.
-- **Sketch an adapter** for an Agent, Workspace, or Runtime not yet in the roadmap — even a 200-line proof of concept is enough to validate the contract.
+- **Propose a capability** for the registry if your Agent or Runtime needs something that's not there.
+- **Sketch an adapter** for an Agent or Runtime not yet in the roadmap — even a 200-line proof of concept is enough to validate the contract.
 - **Build a Host** — the protocol is only useful if real applications drive it. The earliest Hosts will shape the spec the most.
 
-Discussion happens in GitHub Issues for now; a Discord or similar may follow once volume justifies it.
+Discussion happens in GitHub Issues for now.
